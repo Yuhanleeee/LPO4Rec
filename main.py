@@ -265,7 +265,7 @@ class TailImgRec(LightningModule):
         hard_one_hot = one_hot.detach() + one_hot - one_hot.detach()
         return hard_one_hot, topk_indices
     
-    def tkpo_loss(self, user_id, prod, label, tail_flag):
+    def lpo_loss(self, user_id, prod, label, tail_flag):
         k = 5
         tau =5.0
         prod = torch.softmax(prod, dim=-1)
@@ -320,19 +320,19 @@ class TailImgRec(LightningModule):
         
         prod_negs_topk = torch.gather(prod, 1, indx_negs)
         neg_pos_prob = torch.sum(torch.exp(prod_negs_topk/tau), dim=-1) + prod_pos.squeeze(-1)
-        loss_tkpo = prod_pos.squeeze(-1)/neg_pos_prob
+        loss_lpo = prod_pos.squeeze(-1)/neg_pos_prob
         
         ### Tail label loss
-        # loss_tkpo = tail_flag * loss_tkpo
+        # loss_lpo = tail_flag * loss_lpo
         # if torch.sum(tail_flag)>0:
-        #     return torch.sum(loss_tkpo)/torch.sum(tail_flag)
+        #     return torch.sum(loss_lpo)/torch.sum(tail_flag)
         # else:
         #     return 0
         
-        # return loss_tkpo.mean()
-        return loss_tkpo
+        # return loss_lpo.mean()
+        return loss_lpo
 
-    def tkpo_loss_gumbel(self, user_id, prod, label, tail_flag):
+    def lpo_loss_gumbel(self, user_id, prod, label, tail_flag):
         k = 5
         tau = 2.0
         prod = torch.softmax(prod, dim=-1)
@@ -356,17 +356,17 @@ class TailImgRec(LightningModule):
         
         indx_head_onehot = indx_head_onehot.sum(dim=1)
         neg_pos_prob = torch.sum(indx_head_onehot*torch.exp(prob_head/tau), dim=-1) + prod_pos.squeeze(-1)
-        loss_tkpo = prod_pos.squeeze(-1)/neg_pos_prob
+        loss_lpo = prod_pos.squeeze(-1)/neg_pos_prob
         
         ### Tail label loss
-        # loss_tkpo = tail_flag * loss_tkpo
+        # loss_lpo = tail_flag * loss_lpo
         # if torch.sum(tail_flag)>0:
-        #     return torch.sum(loss_tkpo)/torch.sum(tail_flag)
+        #     return torch.sum(loss_lpo)/torch.sum(tail_flag)
         # else:
         #     return 0
         
-        # return loss_tkpo.mean()
-        return loss_tkpo
+        # return loss_lpo.mean()
+        return loss_lpo
 
   
     def training_step(self, batch, batch_idx):
@@ -382,10 +382,10 @@ class TailImgRec(LightningModule):
         
         # loss_ce = self.loss_ce_raw(prod, batch['label_id'].long())
         loss_ce = self.loss_ce(prod, batch['label_id'].long()) ## none reduction
-        # tkpo_loss = self.tkpo_loss(batch['userid'], prod, batch['label_id'].long(), batch['cold_item_flag'])
-        tkpo_loss = self.tkpo_loss_gumbel(batch['userid'], prod, batch['label_id'].long(), batch['cold_item_flag'])
+        # lpo_loss = self.lpo_loss(batch['userid'], prod, batch['label_id'].long(), batch['cold_item_flag'])
+        lpo_loss = self.lpo_loss_gumbel(batch['userid'], prod, batch['label_id'].long(), batch['cold_item_flag'])
         
-        # loss = loss_ce + 0.5*tkpo_loss
+        # loss = loss_ce + 0.5*lpo_loss
         
         # loss = loss_ce
        
@@ -398,9 +398,9 @@ class TailImgRec(LightningModule):
         
         # loss = (tail_weight*loss_ce).sum()
     
-        # loss = (tail_weight*loss_ce).sum() + 0.01*tkpo_loss
+        # loss = (tail_weight*loss_ce).sum() + 0.01*lpo_loss
         
-        loss = (tail_weight*(loss_ce + 0.5*tkpo_loss)).sum() 
+        loss = (tail_weight*(loss_ce + 0.5*lpo_loss)).sum() 
         
         
         self.log("train_loss", loss.item(),  on_epoch=False, prog_bar=True, logger=True)
